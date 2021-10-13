@@ -65,13 +65,15 @@ class TestAccountInvoiceMerge(TransactionCase):
         )
         return invoice.invoice_line_ids - lines
 
-    def _create_invoice(self, partner, name):
+    def _create_invoice(self, partner, name, journal=False):
+        if not journal:
+            journal = self.journal
         invoice = self.inv_model.create(
             {
                 "partner_id": partner.id,
                 "name": name,
-                "type": "out_invoice",
-                "journal_id": self.journal.id,
+                "move_type": "out_invoice",
+                "journal_id": journal.id,
             }
         )
         return invoice
@@ -91,12 +93,14 @@ class TestAccountInvoiceMerge(TransactionCase):
         wiz_id.fields_view_get()
         action = wiz_id.merge_invoices()
 
-        self.assertDictContainsSubset(
-            {
-                "type": "ir.actions.act_window",
-                "xml_id": "account.action_move_out_invoice_type",
-            },
-            action,
+        self.assertEqual(
+            action["type"],
+            "ir.actions.act_window",
+            "There was an error and the two invoices were not merged.",
+        )
+        self.assertEqual(
+            action["xml_id"],
+            "account.action_move_out_invoice_type",
             "There was an error and the two invoices were not merged.",
         )
 
@@ -129,7 +133,7 @@ class TestAccountInvoiceMerge(TransactionCase):
         # Check with two different invoice type
         # Create the invoice 4 with a different account
         invoice4 = self._create_invoice(self.partner1, "D")
-        invoice4.write({"type": "out_refund"})
+        invoice4.write({"move_type": "out_refund"})
         self._create_inv_line(invoice4)
         invoices = self.invoice1 | invoice4
         with self.assertRaises(UserError):
@@ -152,10 +156,10 @@ class TestAccountInvoiceMerge(TransactionCase):
 
         # Check with an another company
         # Create the invoice 6 and change the company
-        invoice6 = self._create_invoice(self.partner1, "E")
-        self._create_inv_line(invoice6)
         new_company = self.env["res.company"].create({"name": "Hello World"})
-        invoice6.company_id = new_company.id
+        new_journal = self.journal.with_company(new_company).copy()
+        invoice6 = self._create_invoice(self.partner1, "E", new_journal)
+        self._create_inv_line(invoice6)
         invoices = self.invoice1 | invoice6
         with self.assertRaises(UserError):
             wiz_id.with_context(
