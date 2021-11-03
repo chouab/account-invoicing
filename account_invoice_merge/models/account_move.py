@@ -203,7 +203,7 @@ class AccountMove(models.Model):
                         invoice_line = invoice_line_obj.search(
                             [
                                 ("id", "in", so_line.invoice_lines.ids),
-                                ("invoice_id", "=", new_invoice_id),
+                                ("move_id", "=", new_invoice_id),
                             ]
                         )
                         if invoice_line:
